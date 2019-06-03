@@ -109,7 +109,6 @@ var p5Game = function(p) {
         easycam.setDistance(p.max([ctrl.w, ctrl.h, ctrl.d]) * 15);
 
         return g;
-
     }
 
     p.randomizeGrid = function(g,r) {
