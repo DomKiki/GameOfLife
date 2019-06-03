@@ -1,0 +1,1 @@
+var game = new p5(p5Game, "canvasDiv");
