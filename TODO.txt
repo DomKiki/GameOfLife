@@ -3,11 +3,15 @@ Features
 
 - Mouse drag to enable/disable cells by hand
     - "Camera/Brush" button to switch modes
-- Z-axis
-- Colors according to alive neighboors (will be important in 3D)
+- Colors according to alive neighboors
 - Theatre mode ?
 
 Design
 ---------
 
 - Place Controls elsewhere
+
+Bugfix
+---------
+
+- Rotation center
