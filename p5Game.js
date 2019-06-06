@@ -4,12 +4,12 @@ var p5Game = function(p) {
           BRUSH  = 1;
     var   state  = CAMERA;
 
-    var gridSize = { h: 10, w: 10, d: 3 },
-        grid,
+    var gridSize = { h: 25, w: 25, d: 1 },
+        grid, age,
         tileSize = 20,
         neighbourhoodRadius = 1;
 
-    var rules = { birth: [4/*3*/], survive: [9/*2,3*/] };
+    var rules = { birth: [3], survive: [2,3] };
 
     var easycam, camState,
         Controls, ctrl, gui,
@@ -24,8 +24,6 @@ var p5Game = function(p) {
 
         var canvas = p.createCanvas(800, 800, p.WEBGL);
         backgroundColor = p.color("#e6ffff");
-        
-        grid = p.initGrid(gridSize, 0.3);
 
         // fix for EasyCam to work with p5 v0.7.2
         Dw.EasyCam.prototype.apply = function(n) {
@@ -39,7 +37,6 @@ var p5Game = function(p) {
         easycam = p.createEasyCam({distance: 800});
         p.initGUI();
         p.enableCamera(true);
-
         p.reset();
 
     }
@@ -62,10 +59,11 @@ var p5Game = function(p) {
 
     p.iterate = function(gr) {
 
-        let g = p.initGrid(gridSize, 0);
+        let g = p.initGrid(gridSize);
         for (let i = 0; i < g.length; i++)
-            for (let j = 0; j < g[i].length; j++) 
+            for (let j = 0; j < g[i].length; j++)
                 for (let k = 0; k < g[i][j].length; k++) {
+
                     let n = p.neighbourhood(gr,i,j,k);
                     if (rules.birth.includes(n))
                         g[i][j][k] = 1;
@@ -73,14 +71,17 @@ var p5Game = function(p) {
                         g[i][j][k] = gr[i][j][k];
                     else
                         g[i][j][k] = 0;
-            }
+
+                    if (g[i][j][k]) age[i][j][k]++;
+                    else age[i][j][k] = 0;
+                }
         return g;
     }
 
     p.neighbourhood = function(g,x,y,z) {
 
         let n = 0,
-            checked = p.initGrid(gridSize, 0);
+            checked = p.initGrid(gridSize);
         for (let i = (x - neighbourhoodRadius); i <= (x + neighbourhoodRadius); i++)
             for (let j = (y - neighbourhoodRadius); j <= (y + neighbourhoodRadius); j++)
                 for (let k = (z - neighbourhoodRadius); k <= (z + neighbourhoodRadius); k++) {
@@ -133,7 +134,7 @@ var p5Game = function(p) {
 
     /********************************************************* Grid ********************************************************/
 
-    p.initGrid = function(gridSize, r) {
+    p.initGrid = function(gridSize) {
         let g = [];
         for (let i = 0; i < gridSize.h; i++) {
             let arrY = [];
@@ -146,7 +147,7 @@ var p5Game = function(p) {
             g.push(arrY);
         }
 
-        return p.randomizeGrid(g, r);
+        return g;
     }
     
     p.randomizeGrid = function(g,r) {
@@ -159,7 +160,7 @@ var p5Game = function(p) {
         return gr;
     }
 
-    p.resizeGrid = function(gr, ctrl) {
+    p.resizeGrid = function(gr) {
         
         // Grid
         let g = gr.slice();
@@ -190,16 +191,41 @@ var p5Game = function(p) {
         return g;
     }
 
+    p.updateGridSize = function(axis, value) {
+
+        // Controls
+        switch (axis) {
+            case "w":
+                ctrl.w = value;
+                break;
+            case "h":
+                ctrl.h = value;
+                break;
+            case "d":
+                ctrl.d = value;
+                break;
+        }
+
+        // Grids resize
+        grid = p.resizeGrid(grid);
+        age  = p.resizeGrid(age);
+
+    }
+
     p.drawGrid = function() {
-        p.stroke(p.color(0));
+
+        p.stroke(p.color(0, 0, 0, 80));
         p.translate(-0.5 * grid[0].length * tileSize, -0.5 * grid.length * tileSize, -0.5 * grid[0][0].length * tileSize);
+
         for (let i = 0; i < grid.length; i++) {
             for (let j = 0; j < grid[i].length; j++)  {
                 for (let k = 0; k < grid[i][j].length; k++) {
-                    if (grid[i][j][k]) p.fill(p.color(0));
-                    else p.noFill();
                     p.translate(0, 0, tileSize);
-                    p.box(tileSize);
+                    // Cells age
+                    if (grid[i][j][k]) {
+                        p.fill(p.ageToColor(age[i][j][k]));
+                        p.box(tileSize);
+                    }
                 }
                 p.translate(tileSize, 0, -tileSize * grid[i][j].length);
             }
@@ -247,13 +273,9 @@ var p5Game = function(p) {
         btnPause.name((paused) ? "Resume" : "Pause");
     }
 
-    p.reset = function() { grid = p.initGrid(gridSize, ctrl.population); 
-        // Debugging purposes, delete afterwards
-        grid[5][5][1] = 1;
-        grid[5][5][2] = 1;
-        grid[5][6][1] = 1;
-        grid[5][6][2] = 1; 
-        p.drawGrid();
+    p.reset = function() { 
+        grid = p.randomizeGrid(p.initGrid(gridSize), ctrl.population);
+        age  = p.initGrid(gridSize);
     }
 
     /********************************************************* GUI *********************************************************/
@@ -272,7 +294,7 @@ var p5Game = function(p) {
             this.lifeThresh  = 3;
             this.brushCamera = function() { p.brushCamera(); }
             this.population  = 0.3;
-            this.fps         = 1/*30*/;
+            this.fps         = 20;
             this.pauseResume = function() { p.pauseResume(); }
             this.reset       = function() { p.reset(); };
         };
@@ -282,22 +304,13 @@ var p5Game = function(p) {
         // Grid dimensions Sliders
         gui.add(ctrl, "w", 1, 50, 1)
            .name("Grid width")
-           .onChange(function(value) {
-                ctrl.w = value;
-                grid   = p.resizeGrid(grid, ctrl);
-            });
+           .onChange(function(value) { p.updateGridSize("w", value) });
         gui.add(ctrl, "h", 1, 50, 1)
            .name("Grid height")
-           .onChange(function(value) {
-                ctrl.h = value;
-                grid   = p.resizeGrid(grid, ctrl);
-            });
+           .onChange(function(value) { p.updateGridSize("h", value) });
         gui.add(ctrl, "d", 1, 50, 1)
            .name("Grid depth")
-           .onChange(function(value) {
-                ctrl.d = value;
-                grid   = p.resizeGrid(grid, ctrl);
-            });
+           .onChange(function(value) { p.updateGridSize("d", value) });
 
         // Rules
         gui.add(ctrl, "nghbrRadius", 1, 5, 1)
@@ -309,7 +322,7 @@ var p5Game = function(p) {
 
         // Simulation control
         //btnBrush = gui.add(ctrl, "brushCamera").name("Brush");
-        gui.add(ctrl, "fps", 1, 60).name("Max FpS");
+        gui.add(ctrl, "fps", 1, 60, 1).name("Max FpS");
         btnPause = gui.add(ctrl, "pauseResume").name("Pause");
         gui.add(ctrl, "population", 0, 1).name("Population Ratio");
         gui.add(ctrl, "reset").name("Populate");
@@ -319,5 +332,7 @@ var p5Game = function(p) {
     /******************************************************** Misc *********************************************************/
 
     p.modulus = function(a,b) { return (a + b) % b; }
+
+    p.ageToColor = function(n) { return p.color(p.map(n, 1, 20, 255, 0), 0, p.map(n, 1, 20,  50, 0), p.map(n, 1, 20, 80, 100)); }
 
 }
